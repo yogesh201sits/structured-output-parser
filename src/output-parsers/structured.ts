@@ -26,7 +26,14 @@ export class StructuredOutputParser<
     return new StructuredOutputParser(schema);
   }
 
-  static fromNamesAndDescriptions<S extends Record<string, string>>(
+  /**
+   * Create a StructuredOutputParser from field names and descriptions.
+   *
+   * Each field is represented as a required string.
+   */
+  static fromNamesAndDescriptions<
+    S extends Record<string, string>,
+  >(
     schemas: S,
   ): StructuredOutputParser<
     z.ZodObject<{
@@ -50,66 +57,90 @@ export class StructuredOutputParser<
    * must be formatted.
    */
   getFormatInstructions(): string {
-    // const jsonSchema = zodToJsonSchema(this.schema);
     const jsonSchema = zodToJsonSchema(this.schema);
+
     jsonSchema.$schema =
       "https://json-schema.org/draft/2020-12/schema";
-   
 
     return `You must format your output as a JSON value that adheres to a given "JSON Schema" instance.
 
-        "JSON Schema" is a declarative language that allows you to annotate and validate JSON documents.
+"JSON Schema" is a declarative language that allows you to annotate and validate JSON documents.
 
-        For example, the example "JSON Schema" instance {{"properties": {{"foo": {{"description": "a list of test words", "type": "array", "items": {{"type": "string"}}}}}}, "required": ["foo"]}}
-        would match an object with one required property, "foo". The "type" property specifies "foo" must be an "array", and the "description" property semantically describes it as a "list of test words". The items within "foo" must be strings.
-        Thus, the object {{"foo": ["bar", "baz"]}} is a well-formatted instance of this example "JSON Schema". The object {{"properties": {{"foo": ["bar", "baz"]}}}} is notwell-formatted.
+For example, the example "JSON Schema" instance {{"properties": {{"foo": {{"description": "a list of test words", "type": "array", "items": {{"type": "string"}}}}}}, "required": ["foo"]}}
+would match an object with one required property, "foo". The "type" property specifies "foo" must be an "array", and the "description" property semantically describes it as a "list of test words". The items within "foo" must be strings.
+Thus, the object {{"foo": ["bar", "baz"]}} is a well-formatted instance of this example "JSON Schema". The object {{"properties": {{"foo": ["bar", "baz"]}}}} is notwell-formatted.
 
-        Your output will be parsed and type-checked according to the provided schema instance, so make sure all fields in your output match the schema exactly and there areno trailing commas!
+Your output will be parsed and type-checked according to the provided schema instance, so make sure all fields in your output match the schema exactly and there are no trailing commas!
 
-        Here is the JSON Schema instance your output must adhere to. Include the enclosing markdown codeblock:
-        \`\`\`json
-        ${JSON.stringify(jsonSchema)}
-        \`\`\``;
+Here is the JSON Schema instance your output must adhere to. Include the enclosing markdown codeblock:
+\`\`\`json
+${JSON.stringify(jsonSchema)}
+\`\`\``;
   }
 
   /**
    * Parse and validate LLM output.
    */
-  async parse1(text: string): Promise<z.infer<T>> {
+  async parse(text: string): Promise<z.infer<T>> {
+    let json: string;
+
+    // Step 1: Extract JSON
     try {
-      const json = this.extractJson(text);
-
-      const parsed = JSON.parse(json);
-
-      return await this.schema.parseAsync(parsed);
+      json = this.extractJson(text);
     } catch (error) {
       if (error instanceof OutputParserException) {
         throw error;
       }
 
       throw new OutputParserException(
-        `Failed to parse. Text: "${text}". Error: ${String(error)}`,
-        text,
-        error instanceof Error ? error.message : String(error),
+        `Failed to extract JSON. Text: "${text}". Error: ${String(error)}`,
+        {
+          code: "INVALID_FORMAT",
+          llmOutput: text,
+          observation:
+            error instanceof Error
+              ? error.message
+              : String(error),
+          cause: error,
+        },
       );
     }
-  }
 
-  async parse(text: string): Promise<z.infer<T>> {
+    // Step 2: Parse JSON
+    let parsed: unknown;
+
     try {
-      const json = this.extractJson(text);
-      const parsed = JSON.parse(json);
+      parsed = JSON.parse(json);
+    } catch (error) {
+      throw new OutputParserException(
+        `Failed to parse JSON. Text: "${text}". Error: ${String(error)}`,
+        {
+          code: "INVALID_JSON",
+          llmOutput: text,
+          observation:
+            error instanceof Error
+              ? error.message
+              : String(error),
+          cause: error,
+        },
+      );
+    }
 
+    // Step 3: Validate against Zod schema
+    try {
       return await this.schema.parseAsync(parsed);
     } catch (error) {
-      if (error instanceof OutputParserException) {
-        throw error;
-      }
-
       throw new OutputParserException(
-        `Failed to parse. Text: "${text}". Error: ${String(error)}`,
-        text,
-        error instanceof Error ? error.message : String(error),
+        `Failed to validate output. Text: "${text}". Error: ${String(error)}`,
+        {
+          code: "SCHEMA_VALIDATION",
+          llmOutput: text,
+          observation:
+            error instanceof Error
+              ? error.message
+              : String(error),
+          cause: error,
+        },
       );
     }
   }
@@ -131,14 +162,14 @@ export class StructuredOutputParser<
     if (!match?.[1]) {
       throw new OutputParserException(
         "Failed to extract JSON from markdown code block.",
-        text,
-        "Expected a fenced JSON code block.",
+        {
+          code: "INVALID_FORMAT",
+          llmOutput: text,
+          observation: "Expected a fenced JSON code block.",
+        },
       );
     }
 
     return match[1].trim();
   }
-
-  
-
 }

@@ -213,4 +213,164 @@ describe("StructuredOutputParser.getFormatInstructions", () => {
       `"description":"The person's occupation"`,
     );
   });
+  test("parses JSON with surrounding whitespace", async () => {
+  const result = await parser.parse(`
+    
+    
+    {
+      "name": "John",
+      "age": 25,
+      "occupation": "software engineer"
+    }
+    
+    
+  `);
+
+  expect(result).toEqual({
+    name: "John",
+    age: 25,
+    occupation: "software engineer",
+  });
+});
+
+test("parses an empty string as invalid output", async () => {
+  await expect(parser.parse("")).rejects.toBeInstanceOf(
+    OutputParserException,
+  );
+});
+
+test("rejects a markdown block without closing fence", async () => {
+  const output = `
+    \`\`\`json
+    {
+      "name": "John",
+      "age": 25,
+      "occupation": "software engineer"
+    }
+  `;
+
+  await expect(parser.parse(output)).rejects.toBeInstanceOf(
+    OutputParserException,
+  );
+});
+
+test("rejects non-JSON content", async () => {
+  await expect(
+    parser.parse("This is not JSON"),
+  ).rejects.toBeInstanceOf(OutputParserException);
+});
+
+test("parses nested JSON structures", async () => {
+  const nestedParser = StructuredOutputParser.fromZodSchema(
+    z.object({
+      user: z.object({
+        name: z.string(),
+        age: z.number(),
+      }),
+      tags: z.array(z.string()),
+    }),
+  );
+
+  const result = await nestedParser.parse(`
+    {
+      "user": {
+        "name": "John",
+        "age": 25
+      },
+      "tags": ["developer", "typescript"]
+    }
+  `);
+
+  expect(result).toEqual({
+    user: {
+      name: "John",
+      age: 25,
+    },
+    tags: ["developer", "typescript"],
+  });
+});
+test("supports optional fields", async () => {
+  const optionalParser = StructuredOutputParser.fromZodSchema(
+    z.object({
+      name: z.string(),
+      nickname: z.string().optional(),
+    }),
+  );
+
+  const result = await optionalParser.parse(`
+    {
+      "name": "John"
+    }
+  `);
+
+  expect(result).toEqual({
+    name: "John",
+  });
+});
+
+test("supports enum fields", async () => {
+  const enumParser = StructuredOutputParser.fromZodSchema(
+    z.object({
+      status: z.enum(["active", "inactive"]),
+    }),
+  );
+
+  const result = await enumParser.parse(`
+    {
+      "status": "active"
+    }
+  `);
+
+  expect(result.status).toBe("active");
+});
+
+test("rejects invalid enum values", async () => {
+  const enumParser = StructuredOutputParser.fromZodSchema(
+    z.object({
+      status: z.enum(["active", "inactive"]),
+    }),
+  );
+
+  await expect(
+    enumParser.parse(`{"status": "pending"}`),
+  ).rejects.toBeInstanceOf(OutputParserException);
+});
+test("classifies invalid JSON errors", async () => {
+  try {
+    await parser.parse(`{"name": "John", "age":}`);
+    throw new Error("Expected parser to throw");
+  } catch (error) {
+    expect(error).toBeInstanceOf(OutputParserException);
+
+    if (error instanceof OutputParserException) {
+      expect(error.code).toBe("INVALID_JSON");
+      expect(error.llmOutput).toBe(`{"name": "John", "age":}`);
+      expect(error.observation).toBeDefined();
+      expect(error.cause).toBeInstanceOf(SyntaxError);
+    }
+  }
+});
+
+test("classifies schema validation errors", async () => {
+  try {
+    await parser.parse(`
+      {
+        "name": "John",
+        "age": "twenty five",
+        "occupation": "software engineer"
+      }
+    `);
+
+    throw new Error("Expected parser to throw");
+  } catch (error) {
+    expect(error).toBeInstanceOf(OutputParserException);
+
+    if (error instanceof OutputParserException) {
+      expect(error.code).toBe("SCHEMA_VALIDATION");
+      expect(error.llmOutput).toBeDefined();
+      expect(error.observation).toContain("Expected number");
+      expect(error.cause).toBeInstanceOf(z.ZodError);
+    }
+  }
+});
 });

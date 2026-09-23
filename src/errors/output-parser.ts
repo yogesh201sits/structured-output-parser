@@ -1,24 +1,30 @@
-export class OutputParserException extends Error {
-  /**
-   * The original output produced by the LLM.
-   */
-  readonly llmOutput?: string;
+export type OutputParserErrorCode =
+  | "INVALID_JSON"
+  | "SCHEMA_VALIDATION"
+  | "INVALID_FORMAT";
 
-  /**
-   * Additional information describing what went wrong.
-   */
+export class OutputParserException extends Error {
+  readonly code: OutputParserErrorCode;
+  readonly llmOutput?: string;
   readonly observation?: string;
 
   constructor(
     message: string,
-    llmOutput?: string,
-    observation?: string,
+    options: {
+      code: OutputParserErrorCode;
+      llmOutput?: string;
+      observation?: string;
+      cause?: unknown;
+    },
   ) {
-    super(message);
+    super(message, {
+      cause: options.cause,
+    });
 
     this.name = "OutputParserException";
-    this.llmOutput = llmOutput;
-    this.observation = observation;
+    this.code = options.code;
+    this.llmOutput = options.llmOutput;
+    this.observation = options.observation;
 
     Object.setPrototypeOf(this, new.target.prototype);
   }
