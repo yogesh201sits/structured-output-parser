@@ -547,19 +547,3 @@ structured-output-parser/
 ├── tsconfig.json
 └── README.md
 ```
-
-## License
-
-MIT
-
-````
-
-One thing before committing this README: **don't publish yet**. First run:
-
-```powershell
-bun run typecheck
-bun run build
-bun test
-````
-
-Then we should do the final **package audit**: `package.json`, generated `dist`, exports, dependency versions, README accuracy, and whether the npm package contains only the files we actually want.
