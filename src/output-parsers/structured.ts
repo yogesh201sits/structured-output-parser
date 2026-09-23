@@ -26,6 +26,25 @@ export class StructuredOutputParser<
     return new StructuredOutputParser(schema);
   }
 
+  static fromNamesAndDescriptions<S extends Record<string, string>>(
+    schemas: S,
+  ): StructuredOutputParser<
+    z.ZodObject<{
+      [K in keyof S]: z.ZodString;
+    }>
+  > {
+    const shape = Object.fromEntries(
+      Object.entries(schemas).map(([name, description]) => [
+        name,
+        z.string().describe(description),
+      ]),
+    ) as {
+      [K in keyof S]: z.ZodString;
+    };
+
+    return new StructuredOutputParser(z.object(shape));
+  }
+
   /**
    * Generate instructions that tell an LLM how its output
    * must be formatted.
@@ -119,4 +138,7 @@ export class StructuredOutputParser<
 
     return match[1].trim();
   }
+
+  
+
 }

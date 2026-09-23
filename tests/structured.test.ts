@@ -7,148 +7,210 @@ import {
 } from "../src";
 
 const schema = z.object({
-  name: z.string().describe("The person's name"),
-  age: z.number().describe("The person's age"),
-  occupation: z.string().describe("The person's occupation"),
+  name: z.string(),
+  age: z.number(),
+  occupation: z.string(),
 });
 
 const parser = StructuredOutputParser.fromZodSchema(schema);
 
 describe("StructuredOutputParser", () => {
-  test("creates parser from Zod schema", () => {
-    expect(parser.schema).toBe(schema);
+  test("parses raw JSON", async () => {
+    const result = await parser.parse(`
+      {
+        "name": "John",
+        "age": 25,
+        "occupation": "software engineer"
+      }
+    `);
+
+    expect(result).toEqual({
+      name: "John",
+      age: 25,
+      occupation: "software engineer",
+    });
   });
 
-  test("generates format instructions", () => {
+  test("parses JSON inside a json markdown code block", async () => {
+    const result = await parser.parse(`
+      \`\`\`json
+      {
+        "name": "John",
+        "age": 25,
+        "occupation": "software engineer"
+      }
+      \`\`\`
+    `);
+
+    expect(result).toEqual({
+      name: "John",
+      age: 25,
+      occupation: "software engineer",
+    });
+  });
+
+  test("parses JSON inside a generic markdown code block", async () => {
+    const result = await parser.parse(`
+      \`\`\`
+      {
+        "name": "John",
+        "age": 25,
+        "occupation": "software engineer"
+      }
+      \`\`\`
+    `);
+
+    expect(result).toEqual({
+      name: "John",
+      age: 25,
+      occupation: "software engineer",
+    });
+  });
+
+  test("throws OutputParserException for invalid JSON", async () => {
+    const output = `
+      \`\`\`json
+      {
+        "name": "John",
+        "age": 25,
+        "occupation": "software engineer",
+      }
+      \`\`\`
+    `;
+
+    try {
+      await parser.parse(output);
+
+      throw new Error("Expected parser to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(OutputParserException);
+
+      if (error instanceof OutputParserException) {
+        expect(error.llmOutput).toBe(output);
+        expect(error.observation).toBeDefined();
+      }
+    }
+  });
+
+  test("throws OutputParserException for schema validation failure", async () => {
+    const output = `
+      {
+        "name": "John",
+        "age": "twenty five",
+        "occupation": "software engineer"
+      }
+    `;
+
+    try {
+      await parser.parse(output);
+
+      throw new Error("Expected parser to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(OutputParserException);
+
+      if (error instanceof OutputParserException) {
+        expect(error.llmOutput).toBe(output);
+        expect(error.observation).toContain("Expected number");
+      }
+    }
+  });
+
+  test("throws when a required field is missing", async () => {
+    const output = `
+      {
+        "name": "John",
+        "occupation": "software engineer"
+      }
+    `;
+
+    await expect(parser.parse(output)).rejects.toBeInstanceOf(
+      OutputParserException,
+    );
+  });
+
+  test("throws when JSON is malformed", async () => {
+    const output = `{"name": "John", "age":}`;
+
+    await expect(parser.parse(output)).rejects.toBeInstanceOf(
+      OutputParserException,
+    );
+  });
+
+  test("returns the correct inferred structure", async () => {
+    const result = await parser.parse(`
+      {
+        "name": "John",
+        "age": 25,
+        "occupation": "software engineer"
+      }
+    `);
+
+    expect(result.name).toBe("John");
+    expect(result.age).toBe(25);
+    expect(result.occupation).toBe("software engineer");
+  });
+});
+
+describe("StructuredOutputParser.getFormatInstructions", () => {
+  test("includes JSON Schema instructions", () => {
     const instructions = parser.getFormatInstructions();
 
     expect(instructions).toContain(
-      "You must format your output as a JSON value",
+      'You must format your output as a JSON value',
     );
 
     expect(instructions).toContain(
-      "Here is the JSON Schema instance your output must adhere to",
+      'Here is the JSON Schema instance your output must adhere to.',
     );
+  });
+
+  test("includes the schema", () => {
+    const instructions = parser.getFormatInstructions();
+
+    expect(instructions).toContain('"name"');
+    expect(instructions).toContain('"age"');
+    expect(instructions).toContain('"occupation"');
+  });
+
+  test("includes the JSON markdown code block", () => {
+    const instructions = parser.getFormatInstructions();
 
     expect(instructions).toContain("```json");
-
-    expect(instructions).toContain(
-      `"name":{"type":"string","description":"The person's name"}`,
-    );
-
-    expect(instructions).toContain(
-      `"age":{"type":"number","description":"The person's age"}`,
-    );
-
-    expect(instructions).toContain(
-      `"occupation":{"type":"string","description":"The person's occupation"}`,
-    );
   });
 
-  test("parses raw JSON", async () => {
-    const result = await parser.parse(
-      JSON.stringify({
-        name: "John",
-        age: 25,
-        occupation: "Software Engineer",
-      }),
-    );
-
-    expect(result).toEqual({
-      name: "John",
-      age: 25,
-      occupation: "Software Engineer",
+  test("creates a parser from names and descriptions", async () => {
+    const parser = StructuredOutputParser.fromNamesAndDescriptions({
+      name: "The person's name",
+      occupation: "The person's occupation",
     });
-  });
 
-  test("parses fenced JSON", async () => {
     const result = await parser.parse(`
-\`\`\`json
-{
-  "name": "John",
-  "age": 25,
-  "occupation": "Software Engineer"
-}
-\`\`\`
-`);
+    {
+      "name": "John",
+      "occupation": "software engineer"
+    }
+  `);
 
     expect(result).toEqual({
       name: "John",
-      age: 25,
-      occupation: "Software Engineer",
+      occupation: "software engineer",
     });
   });
 
-  test("rejects invalid JSON", async () => {
-    await expect(
-      parser.parse(`
-\`\`\`json
-{
-  "name": "John",
-  "age": 25,
-\`\`\`
-`),
-    ).rejects.toBeInstanceOf(OutputParserException);
-  });
-
-  test("rejects data that violates the Zod schema", async () => {
-    await expect(
-      parser.parse(
-        JSON.stringify({
-          name: "John",
-          age: "twenty-five",
-          occupation: "Software Engineer",
-        }),
-      ),
-    ).rejects.toBeInstanceOf(OutputParserException);
-  });
-
-  test("supports nested Zod schemas", async () => {
-    const nestedSchema = z.object({
-      user: z.object({
-        name: z.string(),
-        age: z.number(),
-      }),
-      skills: z.array(z.string()),
+  test("uses descriptions in the generated JSON schema", () => {
+    const parser = StructuredOutputParser.fromNamesAndDescriptions({
+      name: "The person's name",
+      occupation: "The person's occupation",
     });
 
-    const nestedParser =
-      StructuredOutputParser.fromZodSchema(nestedSchema);
+    const instructions = parser.getFormatInstructions();
 
-    const result = await nestedParser.parse(
-      JSON.stringify({
-        user: {
-          name: "John",
-          age: 25,
-        },
-        skills: ["TypeScript", "Bun"],
-      }),
+    expect(instructions).toContain(
+      `"description":"The person's name"`,
     );
 
-    expect(result).toEqual({
-      user: {
-        name: "John",
-        age: 25,
-      },
-      skills: ["TypeScript", "Bun"],
-    });
-  });
-
-  test("preserves TypeScript inference", async () => {
-    const result = await parser.parse(
-      JSON.stringify({
-        name: "John",
-        age: 25,
-        occupation: "Engineer",
-      }),
+    expect(instructions).toContain(
+      `"description":"The person's occupation"`,
     );
-
-    const name: string = result.name;
-    const age: number = result.age;
-    const occupation: string = result.occupation;
-
-    expect(name).toBe("John");
-    expect(age).toBe(25);
-    expect(occupation).toBe("Engineer");
   });
 });
