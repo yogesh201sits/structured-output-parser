@@ -435,4 +435,104 @@ describe("JsonMarkdownStructuredOutputParser", () => {
     ).rejects.toBeInstanceOf(OutputParserException);
   });
 });
+test("parses JSON surrounded by prose", async () => {
+  const parser = StructuredOutputParser.fromZodSchema(
+    z.object({
+      name: z.string(),
+      age: z.number(),
+    }),
+  );
+
+  const result = await parser.parse(`
+    Here is the requested result:
+
+    {
+      "name": "John",
+      "age": 25
+    }
+
+    Hope this helps.
+  `);
+
+  expect(result).toEqual({
+    name: "John",
+    age: 25,
+  });
+});
+
+test("parses nested JSON surrounded by prose", async () => {
+  const parser = StructuredOutputParser.fromZodSchema(
+    z.object({
+      user: z.object({
+        name: z.string(),
+        address: z.object({
+          city: z.string(),
+        }),
+      }),
+    }),
+  );
+
+  const result = await parser.parse(`
+    The result is:
+
+    {
+      "user": {
+        "name": "John",
+        "address": {
+          "city": "Pune"
+        }
+      }
+    }
+
+    End of response.
+  `);
+
+  expect(result).toEqual({
+    user: {
+      name: "John",
+      address: {
+        city: "Pune",
+      },
+    },
+  });
+});
+
+test("parses JSON containing braces inside strings", async () => {
+  const parser = StructuredOutputParser.fromZodSchema(
+    z.object({
+      message: z.string(),
+    }),
+  );
+
+  const result = await parser.parse(`
+    Result:
+
+    {
+      "message": "Hello {world}"
+    }
+  `);
+
+  expect(result).toEqual({
+    message: "Hello {world}",
+  });
+});
+
+test("throws INVALID_FORMAT when JSON cannot be extracted", async () => {
+  const parser = StructuredOutputParser.fromZodSchema(
+    z.object({
+      name: z.string(),
+    }),
+  );
+
+  try {
+    await parser.parse("There is no JSON in this response.");
+    throw new Error("Expected parser to throw");
+  } catch (error) {
+    expect(error).toBeInstanceOf(OutputParserException);
+
+    expect((error as OutputParserException).code).toBe(
+      "INVALID_FORMAT",
+    );
+  }
+});
 });

@@ -2,6 +2,10 @@ import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
 import { OutputParserException } from "../errors/output-parser";
+import {
+  extractJson,
+  JsonExtractionError,
+} from "../utils/json-extractor";
 import { BaseOutputParser } from "./base";
 
 type AnyZodSchema = z.ZodTypeAny;
@@ -84,12 +88,20 @@ ${JSON.stringify(jsonSchema)}
   async parse(text: string): Promise<z.infer<T>> {
     let json: string;
 
-    // Step 1: Extract JSON
+    // Step 1: Extract JSON from the LLM response.
     try {
-      json = this.extractJson(text);
+      json = extractJson(text);
     } catch (error) {
-      if (error instanceof OutputParserException) {
-        throw error;
+      if (error instanceof JsonExtractionError) {
+        throw new OutputParserException(
+          `Failed to extract JSON. Text: "${text}". Error: ${error.message}`,
+          {
+            code: "INVALID_FORMAT",
+            llmOutput: text,
+            observation: error.message,
+            cause: error,
+          },
+        );
       }
 
       throw new OutputParserException(
@@ -106,7 +118,7 @@ ${JSON.stringify(jsonSchema)}
       );
     }
 
-    // Step 2: Parse JSON
+    // Step 2: Parse JSON.
     let parsed: unknown;
 
     try {
@@ -126,7 +138,7 @@ ${JSON.stringify(jsonSchema)}
       );
     }
 
-    // Step 3: Validate against Zod schema
+    // Step 3: Validate against the Zod schema.
     try {
       return await this.schema.parseAsync(parsed);
     } catch (error) {
@@ -143,33 +155,5 @@ ${JSON.stringify(jsonSchema)}
         },
       );
     }
-  }
-
-  /**
-   * Extract JSON from either raw JSON or a markdown code block.
-   */
-  private extractJson(text: string): string {
-    const trimmed = text.trim();
-
-    if (!trimmed.includes("```")) {
-      return trimmed;
-    }
-
-    const match = trimmed.match(
-      /```(?:json)?\s*([\s\S]*?)\s*```/i,
-    );
-
-    if (!match?.[1]) {
-      throw new OutputParserException(
-        "Failed to extract JSON from markdown code block.",
-        {
-          code: "INVALID_FORMAT",
-          llmOutput: text,
-          observation: "Expected a fenced JSON code block.",
-        },
-      );
-    }
-
-    return match[1].trim();
   }
 }
