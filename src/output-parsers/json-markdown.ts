@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
-import { StructuredOutputParser } from "./structured";
+import { StructuredOutputParser } from "./structured.js";
 
 type AnyZodSchema = z.ZodTypeAny;
 

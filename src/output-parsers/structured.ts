@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
-import { OutputParserException } from "../errors/output-parser";
+import { OutputParserException } from "../errors/output-parser.js";
 import {
   extractJson,
   JsonExtractionError,
-} from "../utils/json-extractor";
-import { BaseOutputParser } from "./base";
+} from "../utils/json-extractor.js";
+import { BaseOutputParser } from "./base.js";
 
 type AnyZodSchema = z.ZodTypeAny;
 
