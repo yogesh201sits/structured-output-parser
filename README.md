@@ -1,6 +1,6 @@
 <p align="center">
   <img
-    width="500"
+    width="700"
     src="https://github.com/user-attachments/assets/9701a696-20ad-4cc6-9a3e-4befbc11f221"
     alt="Structured Output Parser"
   />
