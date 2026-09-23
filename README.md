@@ -1,5 +1,11 @@
 <p align="center">
-  <img width="600" height="400" alt="parser-logo" src="https://github.com/user-attachments/assets/51a43c6b-2aba-4dcb-9a48-7591f2fbdcb3" />
+  <p align="center">
+  <img
+    width="700"
+    src="./assets/parser-logo.png"
+    alt="Structured Output Parser"
+  />
+</p>
 </p>
 
 <h1 align="center">Structured Output Parser</h1>
