@@ -167,4 +167,18 @@ describe("extractJson", () => {
       `),
     ).toThrow(JsonExtractionError);
   });
+  test("skips invalid JSON-looking content before valid JSON", () => {
+  const result = extractJson(`
+    Some explanation {not JSON}
+
+    Actual result:
+    {
+      "name": "John"
+    }
+  `);
+
+  expect(JSON.parse(result)).toEqual({
+    name: "John",
+  });
+});
 });

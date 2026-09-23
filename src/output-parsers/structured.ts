@@ -50,8 +50,8 @@ export class StructuredOutputParser<
         z.string().describe(description),
       ]),
     ) as {
-      [K in keyof S]: z.ZodString;
-    };
+        [K in keyof S]: z.ZodString;
+      };
 
     return new StructuredOutputParser(z.object(shape));
   }
@@ -93,10 +93,16 @@ ${JSON.stringify(jsonSchema)}
       json = extractJson(text);
     } catch (error) {
       if (error instanceof JsonExtractionError) {
+        const isInvalidJson =
+          error.message.includes("not valid JSON") ||
+          error.message.includes("incomplete");
+
         throw new OutputParserException(
           `Failed to extract JSON. Text: "${text}". Error: ${error.message}`,
           {
-            code: "INVALID_FORMAT",
+            code: isInvalidJson
+              ? "INVALID_JSON"
+              : "INVALID_FORMAT",
             llmOutput: text,
             observation: error.message,
             cause: error,

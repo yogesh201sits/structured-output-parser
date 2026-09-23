@@ -535,4 +535,27 @@ test("throws INVALID_FORMAT when JSON cannot be extracted", async () => {
     );
   }
 });
+test("classifies complete but invalid JSON as INVALID_JSON", async () => {
+  const parser = StructuredOutputParser.fromZodSchema(
+    z.object({
+      name: z.string(),
+    }),
+  );
+
+  try {
+    await parser.parse(`
+      {
+        "name": "John",
+      }
+    `);
+
+    throw new Error("Expected parser to throw");
+  } catch (error) {
+    expect(error).toBeInstanceOf(OutputParserException);
+
+    expect(
+      (error as OutputParserException).code,
+    ).toBe("INVALID_JSON");
+  }
+});
 });

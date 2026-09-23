@@ -41,7 +41,15 @@ export function extractJson(text: string): string {
     trimmed.startsWith("{") ||
     trimmed.startsWith("[")
   ) {
-    return extractJsonValue(trimmed) ?? trimmed;
+    const extracted = extractJsonValue(trimmed);
+
+    if (extracted !== null) {
+      return extracted;
+    }
+
+    throw new JsonExtractionError(
+      "Found a JSON-like value, but it is incomplete.",
+    );
   }
 
   const extracted = extractJsonValue(trimmed);
@@ -92,35 +100,82 @@ function extractFromCodeFence(
 /**
  * Find a complete JSON object or array inside surrounding prose.
  */
-function extractJsonValue(
-  text: string,
-): string | null {
-  let start = -1;
+function extractJsonValue(text: string): string | null {
+  let foundInvalidCandidate = false;
+  let invalidCandidate: string | null = null;
+  let foundIncompleteCandidate = false;
 
-  for (let i = 0; i < text.length; i++) {
-    const character = text[i];
+  for (let start = 0; start < text.length; start++) {
+    const character = text[start];
 
-    if (character === "{" || character === "[") {
-      start = i;
-      break;
+    if (character !== "{" && character !== "[") {
+      continue;
     }
+
+    const result = scanJsonCandidate(text, start);
+
+    if (result === null) {
+      foundIncompleteCandidate = true;
+      continue;
+    }
+
+    if (isValidJson(result)) {
+      return result;
+    }
+
+    foundInvalidCandidate = true;
+    invalidCandidate ??= result;
   }
 
-  if (start === -1) {
-    return null;
+  if (foundInvalidCandidate || foundIncompleteCandidate) {
+    if (invalidCandidate !== null) {
+      return invalidCandidate;
+    }
+
+    throw new JsonExtractionError(
+      "Found a JSON-like value, but it is not valid JSON.",
+    );
   }
 
-  let depth = 0;
+  return null;
+}
+
+function isValidJson(text: string): boolean {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function scanJsonCandidate(
+  text: string,
+  start: number,
+): string | null {
+  const stack: string[] = [];
+
   let inString = false;
   let escaped = false;
 
-  for (let i = start; i < text.length; i++) {
+  const openingCharacter = text[start];
+
+  if (
+    openingCharacter !== "{" &&
+    openingCharacter !== "["
+  ) {
+    return null;
+  }
+
+  stack.push(
+    openingCharacter === "{"
+      ? "}"
+      : "]",
+  );
+
+  for (let i = start + 1; i < text.length; i++) {
     const character = text[i];
 
-    /*
-     * Inside a JSON string, braces and brackets are normal
-     * characters and must not affect nesting.
-     */
     if (inString) {
       if (escaped) {
         escaped = false;
@@ -144,31 +199,31 @@ function extractJsonValue(
       continue;
     }
 
-    if (
-      character === "{" ||
-      character === "["
-    ) {
-      depth++;
+    if (character === "{" || character === "[") {
+      stack.push(
+        character === "{"
+          ? "}"
+          : "]",
+      );
       continue;
     }
 
-    if (
-      character === "}" ||
-      character === "]"
-    ) {
-      depth--;
+    if (character === "}" || character === "]") {
+      const expected = stack[stack.length - 1];
 
-      if (depth === 0) {
+      if (character !== expected) {
+        return text.slice(start, i + 1).trim();
+      }
+
+      stack.pop();
+
+      if (stack.length === 0) {
         return text.slice(start, i + 1).trim();
       }
     }
   }
 
-  /*
-   * A JSON opening character was found but no matching
-   * closing character was found.
-   */
-  throw new JsonExtractionError(
-    "Incomplete JSON object or array.",
-  );
+  // Opening structure was never closed.
+  return null;
 }
+
