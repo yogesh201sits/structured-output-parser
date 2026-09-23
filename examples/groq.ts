@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import Groq from "groq-sdk";
 import { z } from "zod";
 

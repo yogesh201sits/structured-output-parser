@@ -5,15 +5,14 @@
     "": {
       "name": "structured-output-parser",
       "dependencies": {
-        "zod": "3",
-        "zod-to-json-schema": "^3.25.2",
+        "zod": "^3.0.0",
+        "zod-to-json-schema": "^3.0.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
+        "@types/node": "^26.6.2",
         "groq-sdk": "^1.6.0",
-      },
-      "peerDependencies": {
-        "typescript": "^7.0.2",
+        "typescript": "^7.0.0",
       },
     },
   },

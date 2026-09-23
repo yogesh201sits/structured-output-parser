@@ -11,6 +11,7 @@
     "rootDir": "src",
     "noEmitOnError": true,
     "skipLibCheck": true,
+    "types": ["node"]
   },
   "include": ["src/**/*.ts"],
   "exclude": [
