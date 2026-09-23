@@ -558,4 +558,93 @@ test("classifies complete but invalid JSON as INVALID_JSON", async () => {
     ).toBe("INVALID_JSON");
   }
 });
+describe("JsonMarkdownStructuredOutputParser", () => {
+  test("generates markdown JSON format instructions", () => {
+    const parser = new JsonMarkdownStructuredOutputParser(
+      z.object({
+        name: z.string().describe("The person's name"),
+        age: z.number().describe("The person's age"),
+      }),
+    );
+
+    const instructions = parser.getFormatInstructions();
+
+    expect(instructions).toContain(
+      "Return a markdown code snippet with a JSON object formatted to look like:",
+    );
+
+    expect(instructions).toContain("```json");
+
+    expect(instructions).toContain('"name"');
+    expect(instructions).toContain('"age"');
+    expect(instructions).toContain(
+      "The person's name",
+    );
+  });
+
+  test("parses JSON from a markdown code block", async () => {
+    const parser = new JsonMarkdownStructuredOutputParser(
+      z.object({
+        name: z.string(),
+        age: z.number(),
+      }),
+    );
+
+    const result = await parser.parse(`
+      \`\`\`json
+      {
+        "name": "John",
+        "age": 25
+      }
+      \`\`\`
+    `);
+
+    expect(result).toEqual({
+      name: "John",
+      age: 25,
+    });
+  });
+
+  test("parses JSON from a generic markdown code block", async () => {
+    const parser = new JsonMarkdownStructuredOutputParser(
+      z.object({
+        name: z.string(),
+      }),
+    );
+
+    const result = await parser.parse(`
+      \`\`\`
+      {
+        "name": "John"
+      }
+      \`\`\`
+    `);
+
+    expect(result).toEqual({
+      name: "John",
+    });
+  });
+
+  test("inherits schema validation", async () => {
+    const parser = new JsonMarkdownStructuredOutputParser(
+      z.object({
+        name: z.string(),
+        age: z.number(),
+      }),
+    );
+
+    await expect(
+      parser.parse(`
+        \`\`\`json
+        {
+          "name": "John",
+          "age": "twenty-five"
+        }
+        \`\`\`
+      `),
+    ).rejects.toMatchObject({
+      code: "SCHEMA_VALIDATION",
+    });
+  });
+});
 });
