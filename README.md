@@ -1,10 +1,22 @@
-# Structured Output Parser
+<p align="center">
+  <img
+    width="500"
+    src="https://github.com/user-attachments/assets/9701a696-20ad-4cc6-9a3e-4befbc11f221"
+    alt="Structured Output Parser"
+  />
+</p>
 
-A lightweight, Zod-based structured output parser for LLM responses.
+<h1 align="center">Structured Output Parser</h1>
 
-[![Bun](https://img.shields.io/badge/Bun-runtime-black?style=flat-square&logo=bun)](https://bun.sh/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-typed-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
-[![Zod](https://img.shields.io/badge/Zod-schema_validation-3E67B1?style=flat-square)](https://zod.dev/)
+<p align="center">
+  A lightweight, Zod-based structured output parser for LLM responses.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Bun-runtime-black?style=flat-square&logo=bun" alt="Bun" />
+  <img src="https://img.shields.io/badge/TypeScript-typed-blue?style=flat-square&logo=typescript" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Zod-schema_validation-3E67B1?style=flat-square" alt="Zod" />
+</p>
 
 
 A lightweight, Zod-based structured output parser for LLM responses.
