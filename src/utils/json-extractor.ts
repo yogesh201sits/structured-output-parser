@@ -116,7 +116,7 @@ function extractJsonValue(text: string): string | null {
 
     if (result === null) {
       foundIncompleteCandidate = true;
-      continue;
+      break;
     }
 
     if (isValidJson(result)) {
@@ -212,7 +212,7 @@ function scanJsonCandidate(
       const expected = stack[stack.length - 1];
 
       if (character !== expected) {
-        return text.slice(start, i + 1).trim();
+        return null;
       }
 
       stack.pop();
