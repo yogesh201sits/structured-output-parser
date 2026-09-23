@@ -12,5 +12,9 @@
   "dependencies": {
     "zod": "3",
     "zod-to-json-schema": "^3.25.2"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
   }
 }

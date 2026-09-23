@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
+import { JsonMarkdownStructuredOutputParser } from "../src/output-parsers/json-markdown";
 
 import {
   OutputParserException,
@@ -372,5 +373,66 @@ test("classifies schema validation errors", async () => {
       expect(error.cause).toBeInstanceOf(z.ZodError);
     }
   }
+});
+describe("JsonMarkdownStructuredOutputParser", () => {
+  test("parses JSON markdown output", async () => {
+    const parser = new JsonMarkdownStructuredOutputParser(
+      z.object({
+        name: z.string(),
+        age: z.number(),
+      }),
+    );
+
+    const result = await parser.parse(`
+      \`\`\`json
+      {
+        "name": "John",
+        "age": 25
+      }
+      \`\`\`
+    `);
+
+    expect(result).toEqual({
+      name: "John",
+      age: 25,
+    });
+  });
+
+  test("generates markdown-oriented format instructions", () => {
+    const parser = new JsonMarkdownStructuredOutputParser(
+      z.object({
+        name: z.string().describe("The person's name"),
+        age: z.number().describe("The person's age"),
+      }),
+    );
+
+    const instructions = parser.getFormatInstructions();
+
+    expect(instructions).toContain(
+      "Return a markdown code snippet with a JSON object",
+    );
+
+    expect(instructions).toContain("```json");
+    expect(instructions).toContain('"name"');
+    expect(instructions).toContain('"age"');
+  });
+
+  test("inherits structured validation", async () => {
+    const parser = new JsonMarkdownStructuredOutputParser(
+      z.object({
+        age: z.number(),
+      }),
+    );
+
+    await expect(
+      parser.parse(`
+        \`\`\`json
+        {
+          "age": "twenty"
+        }
+        \`\`\`
+      `),
+    ).rejects.toBeInstanceOf(OutputParserException);
+  });
 });
 });
