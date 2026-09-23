@@ -31,7 +31,11 @@ export class StructuredOutputParser<
    * must be formatted.
    */
   getFormatInstructions(): string {
+    // const jsonSchema = zodToJsonSchema(this.schema);
     const jsonSchema = zodToJsonSchema(this.schema);
+    jsonSchema.$schema =
+      "https://json-schema.org/draft/2020-12/schema";
+   
 
     return `You must format your output as a JSON value that adheres to a given "JSON Schema" instance.
 
@@ -52,10 +56,29 @@ export class StructuredOutputParser<
   /**
    * Parse and validate LLM output.
    */
-  async parse(text: string): Promise<z.infer<T>> {
+  async parse1(text: string): Promise<z.infer<T>> {
     try {
       const json = this.extractJson(text);
 
+      const parsed = JSON.parse(json);
+
+      return await this.schema.parseAsync(parsed);
+    } catch (error) {
+      if (error instanceof OutputParserException) {
+        throw error;
+      }
+
+      throw new OutputParserException(
+        `Failed to parse. Text: "${text}". Error: ${String(error)}`,
+        text,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
+
+  async parse(text: string): Promise<z.infer<T>> {
+    try {
+      const json = this.extractJson(text);
       const parsed = JSON.parse(json);
 
       return await this.schema.parseAsync(parsed);
